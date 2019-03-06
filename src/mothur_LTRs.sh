@@ -20,6 +20,10 @@ cat $1.2.fasta | grep '^>' | cut -f 2 -d '>' | awk -v OFS="\t" '{print $1,$1}' >
 
 /programs/mothur/mothur "#dist.seqs(fasta=$1.aligned.fasta, calc=onegap, countends=T, cutoff=0.20, processors=4)"
 
+
+# get the value to use
+#label=`cat $1.aligned.dist | cut -f 3 | sort -nr | head -n 1`
+
 # now run clustering
 
 /programs/mothur/mothur "#cluster(column=$1.aligned.dist, name=$1.names, method=nearest)"
@@ -30,7 +34,7 @@ cat $1.2.fasta | grep '^>' | cut -f 2 -d '>' | awk -v OFS="\t" '{print $1,$1}' >
 
 #attach the OTU number to the sequence
 
-cat $1.aligned.nn.0.20.fasta | sed 's/\t/-/g' > $1.OTUs.fasta
+cat $1.aligned.nn.0.*.fasta | sed 's/\t/-/g' > $1.OTUs.fasta
 
 # needed to shorten things up
 cat $1.OTUs.fasta | sed 's/xxx/:/g' > temp.fasta
@@ -84,7 +88,6 @@ done
 
 xargs samtools faidx $1.OTUs.fasta < rep.sequences > $1.LTR.OTUreps.fasta
 
-mv *lengths *candidates* LTRs* *names *singleton*  extra_files
 
 #date
 d2=$(date +%s)

@@ -3,6 +3,11 @@
 
 # sh filter_LTR_clusters.sh <DPTE sequences> <Rmod sequences> <LTR OTU reps>
 
+# we need to modify the names of DPTE
+cat $1.fasta | sed 's/comp_TRINITY_//g'  > temp
+mv temp $1.fasta
+
+
 # first combine the files
 cat $1.fasta $2.fasta $3.fasta > all_consensi.fasta
 
@@ -20,18 +25,22 @@ csplit --digits=4 --quiet --prefix=cluster  all_consensi.clusters1.fasta.clstr "
 # grep return T or F
 #https://unix.stackexchange.com/questions/48535/can-grep-return-true-false-or-are-there-alternative-methods
 
-subf="seqs.to.remove" # this file disappeared - why?
+subf="seqs.to.remove" 
 
 rm cluster0000
 
 for f in cluster*
 do
-	if grep -q '718000' $f; then
-		cat $f | grep -v '^>' | grep -v '718000' |  cut -f 2 | cut -f 2 -d " " | cut -f 2 -d '>' | sed 's/\.\.\.//g' >> $subf
+	if grep -q 'tig0' $f; then
+		cat $f | grep -v '^>' | grep -v 'tig0' |  cut -f 2 | cut -f 2 -d " " | cut -f 2 -d '>' | sed 's/\.\.\.//g' >> $subf
 	fi
 done
 
 rm cluster*
+
+# fix the seqs to remove file also, remove any trailing "_"
+#cat seqs.to.remove | cut -f 1,2,3 -d "_" > temp
+#mv temp seqs.to.remove
 
 # get the list of all the sequences for clustering
 
