@@ -31,8 +31,8 @@ rm cluster0000
 
 for f in cluster*
 do
-	if grep -q 'tig0' $f; then
-		cat $f | grep -v '^>' | grep -v 'tig0' |  cut -f 2 | cut -f 2 -d " " | cut -f 2 -d '>' | sed 's/\.\.\.//g' >> $subf
+	if grep -q 'utg' $f; then
+		cat $f | grep -v '^>' | grep -v 'chr' |  cut -f 2 | cut -f 2 -d " " | cut -f 2 -d '>' | sed 's/\.\.\.//g' >> $subf
 	fi
 done
 
@@ -60,8 +60,49 @@ xargs samtools faidx all_consensi.fasta < seqs.to.keep > seqs.tocluster.fasta
 
 /programs/cd-hit-v4.6.1-2012-08-27/cd-hit-est -aS 0.8 -c 0.8 -g 1 -G 0 -A 80 -M 10000 -i seqs.tocluster.fasta -o consensi_clusters2.fasta -T 20
 
-cat consensi_clusters2.fasta $3.fasta > consensi_clusters_final.fasta 
 
+csplit --digits=4 --quiet --prefix=clstr consensi_clusters2.fasta.clstr "/^>/" "{*}"
+
+rm clstr0000
+
+# go through the clstr file 
+# get the ones that are not singletons and run refiner
+
+for f in clstr*
+do
+	if grep -q '^1' $f; then
+		cat $f | head -n 1 | cut -f 2 -d '>' >> not.singletons
+		cat $f | sed '1d' | cut -f 2 -d '>'  | cut -f 1 -d '.' > $f.candidates
+		xargs samtools faidx seqs.tocluster.fasta < $f.candidates > $f.candidates.fasta
+		perl /workdir/jmf422/software/RepeatModeler_new/dist/Refiner $f.candidates.fasta
+		rm $f.candidates
+		rm $f
+		sed "s/>.*/>fam_refiner_$f/" $f.candidates.fasta.refiner_cons > $f.refiner.cons.fasta
+		rm $f.candidates.fasta.refiner_cons
+	fi
+done
+
+# get the sequences of the singletons now
+
+for f in clstr*
+do
+	cat $f | sed '1d' | cut -f 2 -d '>'  | cut -f 1 -d '.' >> singleton.seqs
+done
+
+
+xargs samtools faidx seqs.tocluster.fasta < singleton.seqs > singleton.seqs.fasta
+
+cat *refiner.cons.fasta singleton.seqs.fasta > nonLTRs.cdhit.refiner.fasta
+
+cat nonLTRs.cdhit.refiner.fasta clustered_refined_LTRlib.fasta > consensi_clusters_final.fasta
+
+rm clstr*
+
+#date
+d2=$(date +%s)
+sec=$(( ( $d2 - $d1 ) ))
+hour=$(echo - | awk '{ print '$sec'/3600}')
+echo Runtime: $hour hours \($sec\s\)
 
 
 

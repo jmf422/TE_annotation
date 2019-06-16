@@ -12,7 +12,7 @@ mkdir mask_eval
 cp $1.fasta mask_eval
 cd mask_eval
 
-cp /workdir/jmf422/Polished_genomes/$3/RepeatModeler/$2.fasta .
+cp /workdir/jmf422/zebrafish/RepeatModeler/$2.fasta .
 
 # first run Repeat masker
 

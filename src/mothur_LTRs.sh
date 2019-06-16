@@ -42,7 +42,7 @@ cat temp.fasta | sed 's/#LTR\/Gypsy//g' | sed 's/#LTR\/Copia//g' | sed 's/#LTR\/
 
 # now run Rmasker - do not consider the candidates that have similarity to LINE or DNA element
 
-/programs/RepeatMasker/RepeatMasker -species Drosophila -nolow -div 20 $1.OTUs.fasta
+/programs/RepeatMasker/RepeatMasker -lib zebrep.fa -nolow -div 20 -pa 8 $1.OTUs.fasta # changed this
 
 #get the singletons - they will automatically be the consensus
 
@@ -51,10 +51,11 @@ cat $1.OTUs.fasta | grep '^>' | cut -f 2 -d '-' | uniq -c | sed -e 's/^[ \t]*//'
 cat $1.OTUs.fasta | grep '^>' | cut -f 2 -d '>' > $1.OTUs.names
 grep -f singleton.OTUs $1.OTUs.names > singleton_seqs
 
+# this might need to be fixed - DNA, LINE
 # need to first remove the LTRs that have some extraneous sequence attached.
 less $1.OTUs.fasta.out | sed -e 1,3d | sed -e 's/^[ \t]*//' | tr -s " " | sed 's| |\t|g' | cut -f 5,11 > $1.OTUs.fasta.classification
 
-cat $1.OTUs.fasta.classification | grep -E "(DNA|LINE)" | cut -f 1 > LTRs.with.insertions
+cat $1.OTUs.fasta.classification | grep -E "(DNA|hAT|Mariner)" | cut -f 1 > LTRs.with.insertions
 
 # only want a fasta file with the LTRs that are not in the LTRs.with.insertions file
 
@@ -62,31 +63,37 @@ sort LTRs.with.insertions > LTRs.with.insertions.sorted
 sort $1.OTUs.names > LTRs.all.sorted
 comm -23 LTRs.all.sorted  LTRs.with.insertions.sorted > LTRs.candidates 
 
+sort singleton_seqs > singleton_seqs.sorted
+sort LTRs.candidates > LTRs.candidates.sorted
 
-# combine with the singletons
-cat LTRs.candidates singleton_seqs | sort -u > LTRs.candidates.all
+### new part ####
 
-# now get fasta file
+comm -23 LTRs.candidates.sorted singleton_seqs.sorted > refiner.candidates
 
-xargs samtools faidx $1.OTUs.fasta < LTRs.candidates.all > $1.OTUs.candidates.fasta
+xargs samtools faidx $1.OTUs.fasta < refiner.candidates > refiner.candidates.fasta
 
-# now get the lengths of the file
+# get the singleton sequences to combine with
 
-samtools faidx $1.OTUs.candidates.fasta
-cut -f 1,2 $1.OTUs.candidates.fasta.fai > $1.OTUs.candidates.lengths
+xargs samtools faidx $1.OTUs.fasta < singleton_seqs.sorted > singletons.fasta
 
-otus=`cat $1.OTUs.candidates.lengths | cut -f 1 | cut -f 2 -d '-' | sort -u`
+# go through each OTU that has multiple members and run refiner
 
-# choose the longest sequence as the OTU representatitive
+otus=`cat refiner.candidates | cut -f 2 -d '-' | sort -u`
+
 subf="rep.sequences"
 for o in $otus
 do
-	cat $1.OTUs.candidates.lengths | grep $o | sort -nrk2,2 | head -n 1 | cut -f 1 >> $subf
+	cat refiner.candidates.fasta | grep $o | cut -f 2 -d '>' > $o.seqs
+	type=`head -n 1 $o.seqs | cut -f 2 -d '_' | cut -f 1 -d '-'`
+	xargs samtools faidx refiner.candidates.fasta < $o.seqs > $o.seqs.fasta
+	perl /workdir/jmf422/software/RepeatModeler_new/dist/Refiner $o.seqs.fasta
+	rm $o.seqs
+	rm $o.seqs.fasta
+	sed "s/>.*/>chr_refiner_$type-$o/" $o.seqs.fasta.refiner_cons > $o.refiner.cons.fasta
+	rm $o.seqs.fasta.refiner_cons
 done 
 
-# now get the fasta sequence of the rep 
-
-xargs samtools faidx $1.OTUs.fasta < rep.sequences > $1.LTR.OTUreps.fasta
+cat *.refiner.cons.fasta singletons.fasta > clustered_refined_LTRlib.fasta
 
 
 #date
